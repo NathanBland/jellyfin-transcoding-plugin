@@ -19,6 +19,9 @@ concurrency:
 jobs:
   build-test-package:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plugins/transcoding-policy
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
