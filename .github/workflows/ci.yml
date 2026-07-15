@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 9.0.316
+
+      - name: Restore
+        run: dotnet restore Jellyfin.Plugin.TranscodingPolicy.slnx
+
+      - name: Build
+        run: dotnet build Jellyfin.Plugin.TranscodingPolicy.slnx --configuration Release --no-restore
+
+      - name: Test plugin
+        run: dotnet test Jellyfin.Plugin.TranscodingPolicy.slnx --configuration Release --no-build
+
+      - name: Test release tooling
+        run: python3 -m unittest scripts.tests.test_update_manifest
+
+      - name: Package
+        run: ./scripts/package.sh
+
+      - name: Validate package layout and checksums
+        shell: bash
+        run: |
+          VERSION="$(sed -n 's/^version: *"\([^"]*\)".*/\1/p' build.yaml)"
+          ARCHIVE="artifacts/transcoding-policy_${VERSION}.zip"
+          python3 scripts/validate_package.py --archive "$ARCHIVE"
+          (cd artifacts && sha256sum --check "$(basename "$ARCHIVE").sha256")
+          (cd artifacts && md5sum --check "$(basename "$ARCHIVE").md5")

@@ -3,4 +3,5 @@ bin/
 obj/
 .DS_Store
 TestResults/
-
+__pycache__/
+*.py[cod]

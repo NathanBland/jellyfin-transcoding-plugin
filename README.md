@@ -30,6 +30,19 @@ The plugin performs an exact server-version and private-method signature check
 at startup. If either check fails, the runtime patch is not installed and
 Jellyfin continues normally.
 
+## Install from the Jellyfin catalog
+
+After the first GitHub release workflow completes, add this repository URL in
+**Dashboard → Plugins → Repositories**:
+
+```text
+https://raw.githubusercontent.com/NathanBland/jellyfin-transcoding-plugin/manifest/manifest.json
+```
+
+Then open **Catalog**, select **Transcoding Policy**, install it, and restart
+Jellyfin. The GitHub repository must remain public so Jellyfin can fetch the
+manifest and release archive without GitHub credentials.
+
 ## Build and test
 
 Install a .NET 9 SDK, then run:
@@ -41,9 +54,11 @@ make test
 make package
 ```
 
-The release archive and SHA-256 checksum are written to `artifacts/`.
+The release archive plus SHA-256 and MD5 checksums are written to `artifacts/`.
+The archive contains the two DLLs at its root, which is the layout expected by
+Jellyfin's catalog installer.
 
-## Install on macOS
+## Install manually on macOS
 
 1. Stop Jellyfin.
 2. Extract the release archive into a subdirectory under the active Jellyfin
@@ -66,6 +81,29 @@ The release archive and SHA-256 checksum are written to `artifacts/`.
 
 Installing, removing, or updating the plugin requires a Jellyfin restart.
 Configuration changes affect subsequent transcodes without restarting.
+
+## Automated releases
+
+The repository has two GitHub Actions workflows:
+
+- `CI` builds, tests, packages, and validates every change.
+- `Release Plugin` creates the GitHub release and updates an installable
+  `manifest.json` on the dedicated `manifest` branch.
+
+For the first release, push these files to GitHub, open **Actions → Release
+Plugin → Run workflow**, and enter `v1.0.0.0`. The workflow validates the
+version, creates the tag, uploads the flat ZIP and checksums, then creates the
+`manifest` branch. Pushing an annotated four-part tag such as `v1.0.0.0` also
+triggers the same release path.
+
+The workflow uses the built-in `GITHUB_TOKEN`; no repository secret is needed.
+If release or branch creation is denied, enable **Read and write permissions**
+under **Settings → Actions → General → Workflow permissions**.
+
+For a later release, update the four-part version in both `build.yaml` and the
+plugin `.csproj`, commit it, and run the release workflow with the matching
+`v<version>` tag. Existing entries are retained in the catalog so Jellyfin can
+see release history and upgrades.
 
 ## Default configuration
 
@@ -113,4 +151,3 @@ This release controls the output encoder. For the default MPEG-2 rule, that is
 also enough to make Jellyfin use software processing filters. A future rule
 that forces a complete software pipeline for H.264 or HEVC input would require
 additional, separately validated decoder and hardware-surface patches.
-

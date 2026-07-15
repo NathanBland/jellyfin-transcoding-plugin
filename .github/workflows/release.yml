@@ -1,0 +1,209 @@
+name: Release Plugin
+
+on:
+  push:
+    tags:
+      - "v*.*.*.*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Four-part release tag, for example v1.0.0.0"
+        required: true
+        type: string
+      changelog:
+        description: "Catalog changelog (defaults to Release <version>)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.repository }}-plugin-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 9.0.316
+
+      - name: Resolve and validate version
+        id: release
+        shell: bash
+        env:
+          MANUAL_TAG: ${{ inputs.release_tag }}
+          CHANGELOG_INPUT: ${{ inputs.changelog }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            TAG="$MANUAL_TAG"
+          else
+            TAG="$GITHUB_REF_NAME"
+          fi
+
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must look like v1.0.0.0: $TAG" >&2
+            exit 1
+          fi
+
+          VERSION="${TAG#v}"
+          BUILD_VERSION="$(sed -n 's/^version: *"\([^"]*\)".*/\1/p' build.yaml)"
+          if [[ "$VERSION" != "$BUILD_VERSION" ]]; then
+            echo "Tag version $VERSION does not match build.yaml version $BUILD_VERSION" >&2
+            exit 1
+          fi
+
+          PROJECT_VERSION="$(sed -n 's:.*<Version>\([^<]*\)</Version>.*:\1:p' src/Jellyfin.Plugin.TranscodingPolicy/Jellyfin.Plugin.TranscodingPolicy.csproj | head -n 1)"
+          if [[ "$VERSION" != "$PROJECT_VERSION" ]]; then
+            echo "Tag version $VERSION does not match project version $PROJECT_VERSION" >&2
+            exit 1
+          fi
+
+          BUILD_ABI="$(sed -n 's/^targetAbi: *"\([^"]*\)".*/\1/p' build.yaml)"
+          CATALOG_ABI="$(python3 -c 'import json; print(json.load(open("catalog/plugin.json"))["targetAbi"])')"
+          if [[ "$BUILD_ABI" != "$CATALOG_ABI" ]]; then
+            echo "build.yaml target ABI $BUILD_ABI does not match catalog target ABI $CATALOG_ABI" >&2
+            exit 1
+          fi
+
+          CHANGELOG="${CHANGELOG_INPUT:-Release $VERSION}"
+          CHANGELOG="${CHANGELOG//$'\r'/ }"
+          CHANGELOG="${CHANGELOG//$'\n'/ }"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "changelog=$CHANGELOG" >> "$GITHUB_OUTPUT"
+
+      - name: Restore, build, and test
+        run: |
+          dotnet restore Jellyfin.Plugin.TranscodingPolicy.slnx
+          dotnet build Jellyfin.Plugin.TranscodingPolicy.slnx --configuration Release --no-restore
+          dotnet test Jellyfin.Plugin.TranscodingPolicy.slnx --configuration Release --no-build
+          python3 -m unittest scripts.tests.test_update_manifest
+
+      - name: Package and validate
+        id: package
+        shell: bash
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          ./scripts/package.sh
+          ARCHIVE="artifacts/transcoding-policy_${VERSION}.zip"
+          python3 scripts/validate_package.py --archive "$ARCHIVE"
+          (cd artifacts && sha256sum --check "$(basename "$ARCHIVE").sha256")
+          (cd artifacts && md5sum --check "$(basename "$ARCHIVE").md5")
+          echo "archive=$ARCHIVE" >> "$GITHUB_OUTPUT"
+          echo "checksum=$(awk '{print $1}' "$ARCHIVE.md5")" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag for a manual release
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+            TAG_COMMIT="$(git rev-list -n 1 "$TAG")"
+            if [[ "$TAG_COMMIT" != "$GITHUB_SHA" ]]; then
+              echo "Existing tag $TAG points to $TAG_COMMIT, not $GITHUB_SHA" >&2
+              exit 1
+            fi
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag --annotate "$TAG" --message "Transcoding Policy $VERSION"
+            git push origin "$TAG"
+          fi
+
+      - name: Build Jellyfin repository manifest
+        id: manifest
+        shell: bash
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+          CHANGELOG: ${{ steps.release.outputs.changelog }}
+          ARCHIVE: ${{ steps.package.outputs.archive }}
+          CHECKSUM: ${{ steps.package.outputs.checksum }}
+        run: |
+          MANIFEST="artifacts/manifest.json"
+          if git ls-remote --exit-code --heads origin manifest >/dev/null 2>&1; then
+            git fetch origin manifest
+            git show FETCH_HEAD:manifest.json > "$MANIFEST"
+          else
+            printf '[]\n' > "$MANIFEST"
+          fi
+
+          SOURCE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/$(basename "$ARCHIVE")"
+          TIMESTAMP="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          python3 scripts/update_manifest.py \
+            --manifest "$MANIFEST" \
+            --template catalog/plugin.json \
+            --version "$VERSION" \
+            --source-url "$SOURCE_URL" \
+            --checksum "$CHECKSUM" \
+            --timestamp "$TIMESTAMP" \
+            --changelog "$CHANGELOG"
+          python3 -m json.tool "$MANIFEST" >/dev/null
+          echo "path=$MANIFEST" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update GitHub release
+        shell: bash
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+          ARCHIVE: ${{ steps.package.outputs.archive }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ARCHIVE" "$ARCHIVE.sha256" "$ARCHIVE.md5" --clobber
+          else
+            gh release create "$TAG" \
+              "$ARCHIVE" \
+              "$ARCHIVE.sha256" \
+              "$ARCHIVE.md5" \
+              --verify-tag \
+              --title "Transcoding Policy $VERSION" \
+              --generate-notes
+          fi
+
+      - name: Publish Jellyfin repository manifest
+        shell: bash
+        env:
+          MANIFEST: ${{ steps.manifest.outputs.path }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          WORKTREE="$RUNNER_TEMP/transcoding-policy-manifest"
+          rm -rf "$WORKTREE"
+
+          if git ls-remote --exit-code --heads origin manifest >/dev/null 2>&1; then
+            git fetch origin manifest
+            git worktree add --detach "$WORKTREE" FETCH_HEAD
+          else
+            git worktree add --detach "$WORKTREE"
+            (
+              cd "$WORKTREE"
+              git checkout --orphan manifest
+              git rm -rf .
+            )
+          fi
+
+          cp "$MANIFEST" "$WORKTREE/manifest.json"
+          (
+            cd "$WORKTREE"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add manifest.json
+            if ! git diff --cached --quiet; then
+              git commit --message "Publish Transcoding Policy $VERSION"
+              git push origin HEAD:manifest
+            fi
+          )

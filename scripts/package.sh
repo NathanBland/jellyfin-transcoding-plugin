@@ -4,13 +4,24 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DOTNET_BIN="${DOTNET:-dotnet}"
 CONFIGURATION="${CONFIGURATION:-Release}"
-VERSION="${VERSION:-1.0.0.0}"
+DEFAULT_VERSION="$(sed -n 's/^version: *"\([^"]*\)".*/\1/p' "$ROOT_DIR/build.yaml")"
+VERSION="${VERSION:-$DEFAULT_VERSION}"
 PROJECT="$ROOT_DIR/src/Jellyfin.Plugin.TranscodingPolicy/Jellyfin.Plugin.TranscodingPolicy.csproj"
 PUBLISH_DIR="$ROOT_DIR/artifacts/publish"
-STAGING_DIR="$ROOT_DIR/artifacts/Transcoding Policy_${VERSION}"
+STAGING_DIR="$ROOT_DIR/artifacts/package"
 ARCHIVE="$ROOT_DIR/artifacts/transcoding-policy_${VERSION}.zip"
 
-rm -rf "$PUBLISH_DIR" "$STAGING_DIR" "$ARCHIVE" "$ARCHIVE.sha256"
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "Invalid four-part plugin version: $VERSION" >&2
+    exit 1
+fi
+
+rm -rf \
+    "$PUBLISH_DIR" \
+    "$STAGING_DIR" \
+    "$ARCHIVE" \
+    "$ARCHIVE.sha256" \
+    "$ARCHIVE.md5"
 mkdir -p "$PUBLISH_DIR" "$STAGING_DIR"
 
 "$DOTNET_BIN" publish "$PROJECT" \
@@ -24,9 +35,27 @@ mkdir -p "$PUBLISH_DIR" "$STAGING_DIR"
 cp "$PUBLISH_DIR/Jellyfin.Plugin.TranscodingPolicy.dll" "$STAGING_DIR/"
 cp "$PUBLISH_DIR/0Harmony.dll" "$STAGING_DIR/"
 
-cd "$ROOT_DIR/artifacts"
-zip -q -r "$(basename "$ARCHIVE")" "$(basename "$STAGING_DIR")"
-shasum -a 256 "$(basename "$ARCHIVE")" > "$(basename "$ARCHIVE").sha256"
+zip -q -j \
+    "$ARCHIVE" \
+    "$STAGING_DIR/Jellyfin.Plugin.TranscodingPolicy.dll" \
+    "$STAGING_DIR/0Harmony.dll"
+
+ARCHIVE_NAME="$(basename "$ARCHIVE")"
+if command -v sha256sum >/dev/null 2>&1; then
+    SHA256="$(sha256sum "$ARCHIVE" | awk '{print $1}')"
+else
+    SHA256="$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')"
+fi
+
+if command -v md5sum >/dev/null 2>&1; then
+    MD5="$(md5sum "$ARCHIVE" | awk '{print $1}')"
+else
+    MD5="$(md5 -q "$ARCHIVE")"
+fi
+
+printf '%s  %s\n' "$SHA256" "$ARCHIVE_NAME" > "$ARCHIVE.sha256"
+printf '%s  %s\n' "$MD5" "$ARCHIVE_NAME" > "$ARCHIVE.md5"
 
 echo "Created $ARCHIVE"
-
+echo "SHA-256: $SHA256"
+echo "MD5:     $MD5"
