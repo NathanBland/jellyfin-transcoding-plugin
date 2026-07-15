@@ -1,0 +1,20 @@
+[
+  {
+    "guid": "cf76f48b-2da2-46b7-9237-3c0fd14662e6",
+    "name": "Transcoding Policy",
+    "description": "Applies narrowly scoped transcoding rules before Jellyfin chooses a hardware output encoder. The default rule works around VideoToolbox failures for MPEG-2 Live TV by using libx264 while leaving other transcodes unchanged.",
+    "overview": "Selectively force software encoding for matching transcodes.",
+    "owner": "nathanbland",
+    "category": "General",
+    "versions": [
+      {
+        "version": "1.0.0.0",
+        "changelog": "Release 1.0.0.0",
+        "targetAbi": "10.11.11.0",
+        "sourceUrl": "https://github.com/NathanBland/jellyfin-transcoding-plugin/releases/download/v1.0.0.0/transcoding-policy_1.0.0.0.zip",
+        "checksum": "8a9d2b1b1d9317cdc5af9b5de4d194da",
+        "timestamp": "2026-07-15T16:04:46Z"
+      }
+    ]
+  }
+]
