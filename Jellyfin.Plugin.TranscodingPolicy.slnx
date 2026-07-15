@@ -1,5 +1,5 @@
 <Solution>
   <Project Path="src/Jellyfin.Plugin.TranscodingPolicy/Jellyfin.Plugin.TranscodingPolicy.csproj" />
+  <Project Path="tests/Jellyfin.Plugin.TranscodingPolicy.LoadContextTests/Jellyfin.Plugin.TranscodingPolicy.LoadContextTests.csproj" />
   <Project Path="tests/Jellyfin.Plugin.TranscodingPolicy.Tests/Jellyfin.Plugin.TranscodingPolicy.Tests.csproj" />
 </Solution>
-

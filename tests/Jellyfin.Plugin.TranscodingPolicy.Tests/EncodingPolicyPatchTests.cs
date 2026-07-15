@@ -1,3 +1,4 @@
+using System.Runtime.Loader;
 using System.Runtime.CompilerServices;
 using Jellyfin.Plugin.TranscodingPolicy.Configuration;
 using Jellyfin.Plugin.TranscodingPolicy.Patching;
@@ -8,6 +9,11 @@ namespace Jellyfin.Plugin.TranscodingPolicy.Tests;
 
 public sealed class EncodingPolicyPatchTests : IDisposable
 {
+    public EncodingPolicyPatchTests()
+    {
+        HarmonyAssemblyLoader.EnsureLoaded(NullLogger.Instance);
+    }
+
     public void Dispose()
     {
         EncodingPolicyPatch.Uninstall();
@@ -28,6 +34,22 @@ public sealed class EncodingPolicyPatchTests : IDisposable
         Assert.Contains(
             "Jellyfin.Plugin.TranscodingPolicy.Configuration.configPage.html",
             typeof(Plugin).Assembly.GetManifestResourceNames());
+    }
+
+    [Fact]
+    public void PluginAssembly_EmbedsHarmonyInNonCollectibleLoadContext()
+    {
+        Assert.Contains(
+            HarmonyAssemblyLoader.HarmonyResourceName,
+            typeof(Plugin).Assembly.GetManifestResourceNames());
+
+        var harmonyAssembly = HarmonyAssemblyLoader.EnsureLoaded(NullLogger.Instance);
+        var loadContext = AssemblyLoadContext.GetLoadContext(harmonyAssembly);
+
+        Assert.Equal(HarmonyAssemblyLoader.HarmonyAssemblyName, harmonyAssembly.GetName().Name);
+        Assert.Equal(HarmonyAssemblyLoader.HarmonyVersion, harmonyAssembly.GetName().Version);
+        Assert.NotNull(loadContext);
+        Assert.False(loadContext!.IsCollectible);
     }
 
     [Fact]
@@ -61,11 +83,6 @@ public sealed class EncodingPolicyPatchTests : IDisposable
         EncodingPolicyPatch.Install(NullLogger.Instance, () => configuration);
         EncodingPolicyPatch.Install(NullLogger.Instance, () => configuration);
 
-        var target = EncodingPolicyPatch.FindTargetMethod();
-        Assert.NotNull(target);
-        var owners = HarmonyLib.Harmony.GetPatchInfo(target)?.Owners;
-
-        Assert.NotNull(owners);
-        Assert.Equal(1, owners!.Count(owner => owner == EncodingPolicyPatch.HarmonyId));
+        Assert.Equal(1, EncodingPolicyPatch.InstalledPrefixCount);
     }
 }

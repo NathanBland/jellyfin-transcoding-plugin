@@ -33,12 +33,10 @@ mkdir -p "$PUBLISH_DIR" "$STAGING_DIR"
     -p:FileVersion="$VERSION"
 
 cp "$PUBLISH_DIR/Jellyfin.Plugin.TranscodingPolicy.dll" "$STAGING_DIR/"
-cp "$PUBLISH_DIR/0Harmony.dll" "$STAGING_DIR/"
 
 zip -q -j \
     "$ARCHIVE" \
-    "$STAGING_DIR/Jellyfin.Plugin.TranscodingPolicy.dll" \
-    "$STAGING_DIR/0Harmony.dll"
+    "$STAGING_DIR/Jellyfin.Plugin.TranscodingPolicy.dll"
 
 ARCHIVE_NAME="$(basename "$ARCHIVE")"
 if command -v sha256sum >/dev/null 2>&1; then

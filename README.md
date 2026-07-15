@@ -66,8 +66,10 @@ make package
 ```
 
 The release archive plus SHA-256 and MD5 checksums are written to `artifacts/`.
-The archive contains the two DLLs at its root, which is the layout expected by
-Jellyfin's catalog installer.
+The archive contains the plugin DLL at its root, which is the layout expected
+by Jellyfin's catalog installer. Harmony is embedded and loaded from a
+non-collectible assembly context because Jellyfin loads plugin directories in
+collectible contexts.
 
 ## Manual installation fallback
 
@@ -82,11 +84,10 @@ Manual installations do not receive release discovery through the catalog.
    ~/Library/Application Support/jellyfin/plugins/
    ```
 
-3. Confirm the plugin directory contains both:
+3. Confirm the plugin directory contains:
 
    ```text
    Jellyfin.Plugin.TranscodingPolicy.dll
-   0Harmony.dll
    ```
 
 4. Start Jellyfin.

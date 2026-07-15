@@ -37,6 +37,20 @@ internal static class EncodingPolicyPatch
         }
     }
 
+    internal static int InstalledPrefixCount
+    {
+        get
+        {
+            lock (SyncRoot)
+            {
+                return _targetMethod is null
+                    ? 0
+                    : Harmony.GetPatchInfo(_targetMethod)?.Prefixes.Count(
+                        patch => string.Equals(patch.owner, HarmonyId, StringComparison.Ordinal)) ?? 0;
+            }
+        }
+    }
+
     internal static void Install(ILogger logger, Func<PluginConfiguration?> configurationAccessor)
     {
         ArgumentNullException.ThrowIfNull(logger);
@@ -216,4 +230,3 @@ internal static class EncodingPolicyPatch
             TargetMethodDisplayName,
             installedAtUtc);
 }
-

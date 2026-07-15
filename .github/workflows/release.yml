@@ -76,7 +76,17 @@ jobs:
             exit 1
           fi
 
-          CHANGELOG="${CHANGELOG_INPUT:-Release $VERSION}"
+          DEFAULT_CHANGELOG="$(awk '
+            /^changelog:[[:space:]]*>/ { reading = 1; next }
+            reading && /^[^[:space:]]/ { exit }
+            reading && NF {
+              sub(/^[[:space:]]+/, "")
+              text = text (text ? " " : "") $0
+            }
+            END { print text }
+          ' build.yaml)"
+          CHANGELOG="${CHANGELOG_INPUT:-$DEFAULT_CHANGELOG}"
+          CHANGELOG="${CHANGELOG:-Release $VERSION}"
           CHANGELOG="${CHANGELOG//$'\r'/ }"
           CHANGELOG="${CHANGELOG//$'\n'/ }"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"

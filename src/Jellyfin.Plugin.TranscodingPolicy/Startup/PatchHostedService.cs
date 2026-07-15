@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Jellyfin.Plugin.TranscodingPolicy.Patching;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -18,14 +19,36 @@ internal sealed class PatchHostedService : IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        EncodingPolicyPatch.Install(_logger, static () => Plugin.Instance?.Configuration);
+        try
+        {
+            HarmonyAssemblyLoader.EnsureLoaded(_logger);
+            InstallPatch(_logger);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Transcoding Policy failed to load its patch runtime and will remain inactive");
+        }
+
         return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        EncodingPolicyPatch.Uninstall();
+        if (HarmonyAssemblyLoader.IsLoaded)
+        {
+            UninstallPatch();
+        }
+
         return Task.CompletedTask;
     }
-}
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void InstallPatch(ILogger logger)
+        => EncodingPolicyPatch.Install(logger, static () => Plugin.Instance?.Configuration);
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void UninstallPatch()
+        => EncodingPolicyPatch.Uninstall();
+}

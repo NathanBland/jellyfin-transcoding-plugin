@@ -9,7 +9,6 @@ from pathlib import Path
 
 
 EXPECTED_FILES = {
-    "0Harmony.dll",
     "Jellyfin.Plugin.TranscodingPolicy.dll",
 }
 
