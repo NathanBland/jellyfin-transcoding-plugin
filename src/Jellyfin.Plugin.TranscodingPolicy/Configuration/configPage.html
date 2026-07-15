@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Transcoding Policy</title>
+</head>
+<body>
+    <div id="TranscodingPolicyConfigPage"
+         data-role="page"
+         class="page type-interior pluginConfigurationPage"
+         data-require="emby-input,emby-button,emby-checkbox">
+        <div data-role="content">
+            <div class="content-primary">
+                <h2>Transcoding Policy</h2>
+                <p>
+                    Force Jellyfin to use its normal software encoder for narrowly matched
+                    VideoToolbox transcodes. Nonmatching jobs keep Jellyfin's default behavior.
+                </p>
+
+                <div class="verticalSection">
+                    <h3>Patch status</h3>
+                    <p id="TranscodingPolicyStatus">Loading status…</p>
+                    <p class="fieldDescription">
+                        This release supports Jellyfin 10.11.11 only. Installing or updating the
+                        plugin requires a server restart.
+                    </p>
+                </div>
+
+                <form id="TranscodingPolicyConfigForm">
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="IsEnabled" type="checkbox" is="emby-checkbox" />
+                            <span>Enable Transcoding Policy</span>
+                        </label>
+                        <div class="fieldDescription">
+                            Turning this off leaves the compatibility patch loaded but makes every
+                            transcode use Jellyfin's normal encoder selection.
+                        </div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="EnableSoftwareEncodingRule" type="checkbox" is="emby-checkbox" />
+                            <span>Enable software-encoding rule</span>
+                        </label>
+                        <div class="fieldDescription">
+                            The default rule changes MPEG-2 Live TV output from
+                            h264_videotoolbox to libx264.
+                        </div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="LiveStreamsOnly" type="checkbox" is="emby-checkbox" />
+                            <span>Match live streams only</span>
+                        </label>
+                        <div class="fieldDescription">
+                            Leave enabled to avoid changing MPEG-2 files in normal media libraries.
+                        </div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="InputCodecs">Input codecs</label>
+                        <input id="InputCodecs" type="text" is="emby-input" />
+                        <div class="fieldDescription">
+                            Comma-separated FFmpeg codec names. Default: mpeg2video
+                        </div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="OutputCodecs">Output codecs</label>
+                        <input id="OutputCodecs" type="text" is="emby-input" />
+                        <div class="fieldDescription">
+                            Comma-separated Jellyfin output codec names. Default: h264
+                        </div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="EnableDecisionLogging" type="checkbox" is="emby-checkbox" />
+                            <span>Log matched decisions</span>
+                        </label>
+                        <div class="fieldDescription">
+                            Writes an information log entry whenever a software encoder is selected.
+                        </div>
+                    </div>
+
+                    <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                        <span>Save</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            (function () {
+                'use strict';
+
+                const pluginId = 'cf76f48b-2da2-46b7-9237-3c0fd14662e6';
+                const page = document.querySelector('#TranscodingPolicyConfigPage');
+                const form = document.querySelector('#TranscodingPolicyConfigForm');
+
+                function asCsv(values) {
+                    return Array.isArray(values) ? values.join(', ') : '';
+                }
+
+                function fromCsv(value) {
+                    return value
+                        .split(',')
+                        .map(function (item) { return item.trim(); })
+                        .filter(function (item) { return item.length > 0; });
+                }
+
+                function statusValue(status, camelName, pascalName) {
+                    return status[camelName] !== undefined ? status[camelName] : status[pascalName];
+                }
+
+                async function loadStatus() {
+                    const element = document.querySelector('#TranscodingPolicyStatus');
+                    try {
+                        const status = await ApiClient.ajax({
+                            type: 'GET',
+                            url: ApiClient.getUrl('TranscodingPolicy/Status'),
+                            dataType: 'json'
+                        });
+                        const active = statusValue(status, 'active', 'Active');
+                        const message = statusValue(status, 'message', 'Message');
+                        const serverVersion = statusValue(status, 'serverVersion', 'ServerVersion');
+                        element.textContent = (active ? 'Active' : 'Inactive')
+                            + ' — ' + message + ' Server: ' + serverVersion + '.';
+                    } catch (error) {
+                        element.textContent = 'Status unavailable. Check the Jellyfin server log for Transcoding Policy messages.';
+                    }
+                }
+
+                async function loadConfiguration() {
+                    Dashboard.showLoadingMsg();
+                    try {
+                        const config = await ApiClient.getPluginConfiguration(pluginId);
+                        document.querySelector('#IsEnabled').checked = config.IsEnabled;
+                        document.querySelector('#EnableSoftwareEncodingRule').checked = config.EnableSoftwareEncodingRule;
+                        document.querySelector('#LiveStreamsOnly').checked = config.LiveStreamsOnly;
+                        document.querySelector('#InputCodecs').value = asCsv(config.InputCodecs);
+                        document.querySelector('#OutputCodecs').value = asCsv(config.OutputCodecs);
+                        document.querySelector('#EnableDecisionLogging').checked = config.EnableDecisionLogging;
+                        await loadStatus();
+                    } finally {
+                        Dashboard.hideLoadingMsg();
+                    }
+                }
+
+                page.addEventListener('pageshow', loadConfiguration);
+
+                form.addEventListener('submit', async function (event) {
+                    event.preventDefault();
+                    Dashboard.showLoadingMsg();
+                    try {
+                        const config = await ApiClient.getPluginConfiguration(pluginId);
+                        config.IsEnabled = document.querySelector('#IsEnabled').checked;
+                        config.EnableSoftwareEncodingRule = document.querySelector('#EnableSoftwareEncodingRule').checked;
+                        config.LiveStreamsOnly = document.querySelector('#LiveStreamsOnly').checked;
+                        config.InputCodecs = fromCsv(document.querySelector('#InputCodecs').value);
+                        config.OutputCodecs = fromCsv(document.querySelector('#OutputCodecs').value);
+                        config.EnableDecisionLogging = document.querySelector('#EnableDecisionLogging').checked;
+                        const result = await ApiClient.updatePluginConfiguration(pluginId, config);
+                        Dashboard.processPluginConfigurationUpdateResult(result);
+                    } finally {
+                        Dashboard.hideLoadingMsg();
+                    }
+                    return false;
+                });
+            }());
+        </script>
+    </div>
+</body>
+</html>
+

@@ -1,0 +1,20 @@
+---
+name: "Transcoding Policy"
+guid: "cf76f48b-2da2-46b7-9237-3c0fd14662e6"
+version: "1.0.0.0"
+targetAbi: "10.11.11.0"
+framework: "net9.0"
+overview: "Selectively force software encoding for matching transcodes."
+description: >
+  Applies narrowly scoped transcoding rules before Jellyfin chooses a hardware
+  output encoder. The default rule works around VideoToolbox failures for
+  MPEG-2 Live TV by using libx264 while leaving other transcodes unchanged.
+category: "General"
+owner: "nathanbland"
+artifacts:
+- "Jellyfin.Plugin.TranscodingPolicy.dll"
+- "0Harmony.dll"
+changelog: >
+  Initial release for Jellyfin 10.11.11 with a configurable MPEG-2 Live TV
+  software-encoding policy and fail-open compatibility checks.
+
