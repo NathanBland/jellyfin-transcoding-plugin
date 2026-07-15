@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.0.0.1",
+        "changelog": "Load the embedded Harmony runtime from a non-collectible assembly context so the policy patch can install under Jellyfin 10.11.11's collectible plugin loader. The release package no longer ships a standalone 0Harmony.dll.",
+        "targetAbi": "10.11.11.0",
+        "sourceUrl": "https://github.com/NathanBland/jellyfin-transcoding-plugin/releases/download/v1.0.0.1/transcoding-policy_1.0.0.1.zip",
+        "checksum": "5fe32e4e1808e842f8eabb9e53c87ec8",
+        "timestamp": "2026-07-15T17:53:23Z"
+      },
+      {
         "version": "1.0.0.0",
         "changelog": "Release 1.0.0.0",
         "targetAbi": "10.11.11.0",
