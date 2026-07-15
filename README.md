@@ -30,18 +30,29 @@ The plugin performs an exact server-version and private-method signature check
 at startup. If either check fails, the runtime patch is not installed and
 Jellyfin continues normally.
 
-## Install from the Jellyfin catalog
+## Recommended installation: Jellyfin repository
 
-After the first GitHub release workflow completes, add this repository URL in
-**Dashboard → Plugins → Repositories**:
+Install and manage the plugin through Jellyfin's plugin system:
 
-```text
-https://raw.githubusercontent.com/NathanBland/jellyfin-transcoding-plugin/manifest/manifest.json
-```
+1. Open **Dashboard → Plugins → Repositories**.
+2. Add a repository with these values:
 
-Then open **Catalog**, select **Transcoding Policy**, install it, and restart
-Jellyfin. The GitHub repository must remain public so Jellyfin can fetch the
-manifest and release archive without GitHub credentials.
+   ```text
+   Repository name: Transcoding Policy
+   Repository URL:  https://raw.githubusercontent.com/NathanBland/jellyfin-transcoding-plugin/manifest/manifest.json
+   ```
+
+3. Save the repository.
+4. Open **Dashboard → Plugins → Catalog**, find **Transcoding Policy**, and
+   install it.
+5. Restart Jellyfin to load the plugin.
+6. Open **Dashboard → Plugins → My Plugins → Transcoding Policy** to confirm
+   the patch is active and review its settings.
+
+This is the preferred installation method because Jellyfin can discover new
+compatible releases through the same repository. The GitHub repository must
+remain public so Jellyfin can fetch the manifest and release archive without
+GitHub credentials.
 
 ## Build and test
 
@@ -58,7 +69,10 @@ The release archive plus SHA-256 and MD5 checksums are written to `artifacts/`.
 The archive contains the two DLLs at its root, which is the layout expected by
 Jellyfin's catalog installer.
 
-## Install manually on macOS
+## Manual installation fallback
+
+Use this only when the Jellyfin repository/catalog method is unavailable.
+Manual installations do not receive release discovery through the catalog.
 
 1. Stop Jellyfin.
 2. Extract the release archive into a subdirectory under the active Jellyfin
@@ -90,11 +104,10 @@ The repository has two GitHub Actions workflows:
 - `Release Plugin` creates the GitHub release and updates an installable
   `manifest.json` on the dedicated `manifest` branch.
 
-For the first release, push these files to GitHub, open **Actions → Release
-Plugin → Run workflow**, and enter `v1.0.0.0`. The workflow validates the
-version, creates the tag, uploads the flat ZIP and checksums, then creates the
-`manifest` branch. Pushing an annotated four-part tag such as `v1.0.0.0` also
-triggers the same release path.
+To publish a release, open **Actions → Release Plugin → Run workflow** and enter
+a four-part tag such as `v1.1.0.0`. The workflow validates the version, creates
+the tag, uploads the flat ZIP and checksums, and updates the `manifest` branch.
+Pushing an annotated four-part version tag triggers the same release path.
 
 The workflow uses the built-in `GITHUB_TOKEN`; no repository secret is needed.
 If release or branch creation is denied, enable **Read and write permissions**
