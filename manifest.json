@@ -42,5 +42,23 @@
         "timestamp": "2026-07-15T23:24:34Z"
       }
     ]
+  },
+  {
+    "guid": "6dbb9479-cd8e-4b64-8c10-70e64c90a809",
+    "name": "Recording Transcoder",
+    "description": "Transactionally replaces completed raw DVR transport streams with validated AV1, HEVC, or H.264 from Jellyfin FFmpeg while preserving recording paths.",
+    "overview": "Safely recompress completed DVR recordings with Jellyfin FFmpeg.",
+    "owner": "nathanbland",
+    "category": "General",
+    "versions": [
+      {
+        "version": "1.0.0.0",
+        "changelog": "Initial release with cross-platform Jellyfin hardware settings, verified software fallback, transactional recording replacement, stream and caption validation, crash recovery, and coordinated commercial scans.",
+        "targetAbi": "10.11.11.0",
+        "sourceUrl": "https://github.com/NathanBland/jellyfin-plugins/releases/download/recording-transcoder-v1.0.0.0/recording-transcoder_1.0.0.0.zip",
+        "checksum": "9d4a938f46deadce7f9c001912141fa6",
+        "timestamp": "2026-07-15T23:25:41Z"
+      }
+    ]
   }
 ]
