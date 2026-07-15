@@ -1,157 +1,45 @@
-# Jellyfin Transcoding Policy
+# Transcoding Policy
 
-`Transcoding Policy` is a Jellyfin 10.11.11 server plugin that selectively
-forces Jellyfin's existing software output encoder for matching transcodes.
-
-Its default policy works around a macOS VideoToolbox failure affecting MPEG-2
-Live TV sources such as HDHomeRun channels:
+Transcoding Policy selectively chooses Jellyfin's software output encoder for matching transcodes. Its default rule works around the macOS VideoToolbox failure affecting MPEG-2 Live TV sources such as HDHomeRun channels:
 
 ```text
-VideoToolbox selected
-+ hardware encoding enabled
-+ live stream
-+ MPEG-2 input
-+ H.264 output
+VideoToolbox enabled + live MPEG-2 input + H.264 output
 → libx264
 ```
 
-All nonmatching jobs use Jellyfin's unmodified encoder selection. H.264 and
-HEVC library transcodes therefore continue to use VideoToolbox when Jellyfin
-would normally select it.
+Nonmatching jobs continue through Jellyfin's normal encoder selection, so ordinary H.264 and HEVC library transcodes can still use VideoToolbox.
 
-## Compatibility
+Requires Jellyfin Server 10.11.11 / .NET 9. The plugin performs an exact server-version and internal-method check at startup; if either check fails, the patch is not installed and Jellyfin continues normally.
 
-- Jellyfin Server: **10.11.11 only**
-- Target framework: .NET 9
-- Intended platform: macOS with Apple VideoToolbox
-- Development dependency: .NET 9 SDK
+## Install
 
-The plugin performs an exact server-version and private-method signature check
-at startup. If either check fails, the runtime patch is not installed and
-Jellyfin continues normally.
+1. Add the repository URL from the [root README](../../README.md) to Jellyfin.
+2. Install **Transcoding Policy** from **Dashboard → Plugins → Catalog**.
+3. Restart Jellyfin.
+4. Open **Dashboard → Plugins → My Plugins → Transcoding Policy** and confirm that the patch is active.
 
-## Recommended installation: Jellyfin repository
+Installing, updating, or removing the plugin requires a Jellyfin restart. Configuration changes apply to subsequent transcodes without restarting.
 
-Install and manage the plugin through Jellyfin's plugin system:
+## Default rule
 
-1. Open **Dashboard → Plugins → Repositories**.
-2. Add a repository with these values:
+- Plugin enabled.
+- Software-encoding rule enabled.
+- Live streams only.
+- Input codec: `mpeg2video`.
+- Output codec: `h264`.
+- Decision logging enabled.
 
-   ```text
-   Repository name: Jellyfin Plugins
-   Repository URL:  https://raw.githubusercontent.com/NathanBland/jellyfin-plugins/manifest/manifest.json
-   ```
+Codec lists use comma-separated FFmpeg/Jellyfin codec identifiers. Turning off **Live streams only** also allows matching library files.
 
-3. Save the repository.
-4. Open **Dashboard → Plugins → Catalog**, find **Transcoding Policy**, and
-   install it.
-5. Restart Jellyfin to load the plugin.
-6. Open **Dashboard → Plugins → My Plugins → Transcoding Policy** to confirm
-   the patch is active and review its settings.
+## Verify
 
-This is the preferred installation method because Jellyfin can discover new
-compatible releases through the same repository. The GitHub repository must
-remain public so Jellyfin can fetch the manifest and release archive without
-GitHub credentials.
-
-## Build and test
-
-Install a .NET 9 SDK, change into this package directory, then run:
-
-```bash
-make restore
-make build
-make test
-make package
-```
-
-From the repository root, the equivalent command is:
-
-```bash
-make PLUGIN=transcoding-policy ci
-```
-
-The release archive plus SHA-256 and MD5 checksums are written to `artifacts/`.
-The archive contains the plugin DLL at its root, which is the layout expected
-by Jellyfin's catalog installer. Harmony is embedded and loaded from a
-non-collectible assembly context because Jellyfin loads plugin directories in
-collectible contexts.
-
-## Manual installation fallback
-
-Use this only when the Jellyfin repository/catalog method is unavailable.
-Manual installations do not receive release discovery through the catalog.
-
-1. Stop Jellyfin.
-2. Extract the release archive into a subdirectory under the active Jellyfin
-   plugins directory. A default native macOS installation commonly uses:
-
-   ```text
-   ~/Library/Application Support/jellyfin/plugins/
-   ```
-
-3. Confirm the plugin directory contains:
-
-   ```text
-   Jellyfin.Plugin.TranscodingPolicy.dll
-   ```
-
-4. Start Jellyfin.
-5. Open **Dashboard → Plugins → Transcoding Policy** and confirm the patch is
-   active.
-
-Installing, removing, or updating the plugin requires a Jellyfin restart.
-Configuration changes affect subsequent transcodes without restarting.
-
-## Automated releases
-
-The repository has shared CI and a plugin-specific release workflow:
-
-- `CI` builds, tests, packages, and validates every change.
-- `Release Transcoding Policy` creates the GitHub release and updates the
-  shared installable `manifest.json` on the dedicated `manifest` branch.
-
-To publish a release, open
-**Actions → Release Transcoding Policy → Run workflow** and enter a tag such as
-`transcoding-policy-v1.1.0.0`. The workflow validates the version, creates the
-tag, uploads the flat ZIP and checksums, and updates the `manifest` branch.
-Pushing an annotated tag with the same format triggers the release path.
-
-The workflow uses the built-in `GITHUB_TOKEN`; no repository secret is needed.
-If release or branch creation is denied, enable **Read and write permissions**
-under **Settings → Actions → General → Workflow permissions**.
-
-For a later release, update the four-part version in both `build.yaml` and the
-plugin `.csproj`, commit it, and run the release workflow with the matching
-`transcoding-policy-v<version>` tag. Existing entries are retained in the
-shared catalog so Jellyfin can see release history and upgrades.
-
-## Default configuration
-
-- Plugin enabled: yes
-- Software-encoding rule enabled: yes
-- Live streams only: yes
-- Input codecs: `mpeg2video`
-- Output codecs: `h264`
-- Decision logging: yes
-
-Codec lists are comma-separated FFmpeg/Jellyfin codec identifiers. Turning off
-"Live streams only" also applies the rule to matching library files.
-
-## Verify the workaround
-
-Start an affected HDHomeRun channel, then inspect the newest FFmpeg transcode
-log. A matching job should contain:
+Start an affected HDHomeRun channel and inspect its FFmpeg transcode log. A matching job should contain:
 
 ```text
 -c:v libx264
 ```
 
-It should no longer select `h264_videotoolbox`. Because VideoToolbox does not
-decode the MPEG-2 source, Jellyfin 10.11.11 will also choose its software filter
-chain for that job.
-
-The Jellyfin server log records a message beginning with:
+It should not select `h264_videotoolbox`. The Jellyfin server log also records:
 
 ```text
 Transcoding Policy selected software encoder libx264
@@ -159,16 +47,45 @@ Transcoding Policy selected software encoder libx264
 
 ## Safety and rollback
 
-The patch changes only the return value of Jellyfin's encoder-selection method
-when the configured rule matches. It does not edit `encoding.xml`, rewrite
-FFmpeg command strings, or mutate global transcoding settings.
+The plugin changes only Jellyfin's encoder-selection return value for a matching rule. It does not edit `encoding.xml`, rewrite generated FFmpeg commands, or change global transcoding settings.
 
-If evaluation throws an exception, the prefix returns control to Jellyfin. To
-roll back, stop Jellyfin, remove the plugin directory, and start Jellyfin again.
+If policy evaluation fails, Jellyfin's original selection runs. To roll back, stop Jellyfin, remove the plugin, and start Jellyfin again.
 
-## Current scope
+This release controls the output encoder. For the default MPEG-2 rule, Jellyfin also chooses its software processing filters. Forcing a complete software pipeline for H.264 or HEVC input would require additional decoder/filter policy support.
 
-This release controls the output encoder. For the default MPEG-2 rule, that is
-also enough to make Jellyfin use software processing filters. A future rule
-that forces a complete software pipeline for H.264 or HEVC input would require
-additional, separately validated decoder and hardware-surface patches.
+## Manual installation
+
+Use this only when the catalog is unavailable:
+
+1. Stop Jellyfin.
+2. Extract the release ZIP into its own directory under Jellyfin's plugin directory.
+3. Confirm that directory contains `Jellyfin.Plugin.TranscodingPolicy.dll`.
+4. Start Jellyfin and confirm the patch status.
+
+A default native macOS plugin directory is commonly:
+
+```text
+~/Library/Application Support/jellyfin/plugins/
+```
+
+Manual installations do not receive catalog update discovery.
+
+## Development
+
+From this directory:
+
+```bash
+make restore
+make build
+make test
+make package
+make validate-package
+```
+
+From the repository root:
+
+```bash
+make PLUGIN=transcoding-policy ci
+```
+
+The release archive and checksums are written to `artifacts/`. Maintainers publish with the **Release Jellyfin Plugin** workflow using a tag such as `transcoding-policy-v1.1.0.0`.

@@ -19,9 +19,19 @@ concurrency:
 jobs:
   build-test-package:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - slug: transcoding-policy
+            solution: Jellyfin.Plugin.TranscodingPolicy.slnx
+          - slug: commercial-skipper
+            solution: Jellyfin.Plugin.CommercialSkipper.slnx
+          - slug: recording-transcoder
+            solution: Jellyfin.Plugin.RecordingTranscoder.slnx
     defaults:
       run:
-        working-directory: plugins/transcoding-policy
+        working-directory: plugins/${{ matrix.slug }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -32,15 +42,16 @@ jobs:
           dotnet-version: 9.0.316
 
       - name: Restore
-        run: dotnet restore Jellyfin.Plugin.TranscodingPolicy.slnx
+        run: dotnet restore "${{ matrix.solution }}"
 
       - name: Build
-        run: dotnet build Jellyfin.Plugin.TranscodingPolicy.slnx --configuration Release --no-restore
+        run: dotnet build "${{ matrix.solution }}" --configuration Release --no-restore
 
       - name: Test plugin
-        run: dotnet test Jellyfin.Plugin.TranscodingPolicy.slnx --configuration Release --no-build
+        run: dotnet test "${{ matrix.solution }}" --configuration Release --no-build
 
-      - name: Test release tooling
+      - name: Test shared release tooling
+        if: matrix.slug == 'transcoding-policy'
         run: python3 -m unittest scripts.tests.test_update_manifest
 
       - name: Package
@@ -50,7 +61,17 @@ jobs:
         shell: bash
         run: |
           VERSION="$(sed -n 's/^version: *"\([^"]*\)".*/\1/p' build.yaml)"
-          ARCHIVE="artifacts/transcoding-policy_${VERSION}.zip"
+          ARCHIVE="artifacts/${{ matrix.slug }}_${VERSION}.zip"
           python3 scripts/validate_package.py --archive "$ARCHIVE"
           (cd artifacts && sha256sum --check "$(basename "$ARCHIVE").sha256")
           (cd artifacts && md5sum --check "$(basename "$ARCHIVE").md5")
+
+      - name: Upload package
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.slug }}
+          path: |
+            plugins/${{ matrix.slug }}/artifacts/${{ matrix.slug }}_*.zip
+            plugins/${{ matrix.slug }}/artifacts/${{ matrix.slug }}_*.zip.sha256
+            plugins/${{ matrix.slug }}/artifacts/${{ matrix.slug }}_*.zip.md5
+          if-no-files-found: error

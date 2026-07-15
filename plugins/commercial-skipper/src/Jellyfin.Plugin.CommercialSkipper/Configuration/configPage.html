@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Commercial Skipper</title>
+</head>
+<body>
+<div id="CommercialSkipperConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox">
+    <div data-role="content">
+        <div class="content-primary">
+            <form id="CommercialSkipperConfigForm">
+                <h2>Commercial Skipper</h2>
+                <p>Completed recordings are analyzed by external Comskip and published as native Jellyfin Commercial media segments. Recordings are never modified.</p>
+
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label class="emby-checkbox-label"><input id="AutomaticAnalysis" type="checkbox" is="emby-checkbox"><span>Automatically analyze new recordings</span></label>
+                </div>
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label class="emby-checkbox-label"><input id="FollowRecordingLibraries" type="checkbox" is="emby-checkbox"><span>Always follow Jellyfin DVR recording libraries</span></label>
+                </div>
+
+                <h3>Additional libraries</h3>
+                <div id="CommercialSkipperLibraries"><p>Loading libraries…</p></div>
+
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="ComskipPath">Comskip executable</label>
+                    <input id="ComskipPath" type="text" is="emby-input" placeholder="/opt/homebrew/bin/comskip">
+                    <div class="fieldDescription">Leave blank to search PATH and common Homebrew locations.</div>
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="CustomIniPath">Custom comskip.ini</label>
+                    <input id="CustomIniPath" type="text" is="emby-input">
+                    <div class="fieldDescription">Optional. Output is always normalized to safe EDL-only settings.</div>
+                </div>
+                <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="CompletionDelaySeconds">Completion delay (seconds)</label><input id="CompletionDelaySeconds" type="number" min="0" max="86400" is="emby-input"></div>
+                <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="StabilitySeconds">File stability interval (seconds)</label><input id="StabilitySeconds" type="number" min="1" max="3600" is="emby-input"></div>
+                <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="ComskipThreads">Comskip threads</label><input id="ComskipThreads" type="number" min="1" max="16" is="emby-input"></div>
+                <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="MaxConcurrentJobs">Concurrent jobs</label><input id="MaxConcurrentJobs" type="number" min="1" max="4" is="emby-input"></div>
+                <div class="inputContainer"><label class="inputLabel inputLabelUnfocused" for="TimeoutMinutes">Timeout (minutes)</label><input id="TimeoutMinutes" type="number" min="1" max="1440" is="emby-input"></div>
+                <div class="checkboxContainer checkboxContainer-withDescription"><label class="emby-checkbox-label"><input id="PlayNice" type="checkbox" is="emby-checkbox"><span>Run Comskip in play-nice mode</span></label></div>
+                <div class="checkboxContainer checkboxContainer-withDescription"><label class="emby-checkbox-label"><input id="KeepFailedJobDiagnostics" type="checkbox" is="emby-checkbox"><span>Keep failed-job diagnostics</span></label></div>
+
+                <button is="emby-button" type="submit" class="raised button-submit block emby-button"><span>Save</span></button>
+            </form>
+
+            <h3>Actions</h3>
+            <button id="CommercialSkipperTest" is="emby-button" type="button" class="raised emby-button"><span>Test Comskip</span></button>
+            <button id="CommercialSkipperScan" is="emby-button" type="button" class="raised emby-button"><span>Scan pending recordings</span></button>
+            <button id="CommercialSkipperForceScan" is="emby-button" type="button" class="raised emby-button"><span>Force reanalysis</span></button>
+            <p id="CommercialSkipperStatus"></p>
+
+            <h3>Playback setup</h3>
+            <p>For each user, set <strong>Playback → Media Segment Actions → Commercial → Ask to Skip</strong>. If Intro Skipper is installed, disable its commercial-chapter scan to avoid duplicate ranges.</p>
+        </div>
+    </div>
+    <script type="text/javascript">
+        (() => {
+            const pluginId = '19323a5b-d8ac-45f4-a1c5-3832498c58bc';
+            const page = document.querySelector('#CommercialSkipperConfigPage');
+            const value = id => document.querySelector('#' + id);
+            const property = (object, camelCase, pascalCase) => object[camelCase] !== undefined ? object[camelCase] : object[pascalCase];
+            const escapeHtml = text => String(text ?? '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
+
+            async function api(path, method, data) {
+                return ApiClient.ajax({
+                    type: method || 'GET',
+                    url: ApiClient.getUrl(path),
+                    data: data ? JSON.stringify(data) : undefined,
+                    contentType: data ? 'application/json' : undefined,
+                    dataType: 'json'
+                });
+            }
+
+            async function loadLibraries() {
+                const libraries = await api('CommercialSkipper/Libraries');
+                const host = value('CommercialSkipperLibraries');
+                host.innerHTML = '';
+                libraries.forEach(library => {
+                    const id = property(library, 'id', 'Id');
+                    const name = property(library, 'name', 'Name');
+                    const locations = property(library, 'locations', 'Locations') || [];
+                    const isSelected = property(library, 'isExplicitlySelected', 'IsExplicitlySelected');
+                    const isDvrManaged = property(library, 'isDvrManaged', 'IsDvrManaged');
+                    const isAvailable = property(library, 'isAvailable', 'IsAvailable') !== false;
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'checkboxContainer checkboxContainer-withDescription';
+                    wrapper.innerHTML = `<label class="emby-checkbox-label"><input type="checkbox" is="emby-checkbox" data-library-id="${escapeHtml(id)}" ${isSelected ? 'checked' : ''}><span>${escapeHtml(name)}${isDvrManaged ? ' (DVR)' : ''}${isAvailable ? '' : ' (unavailable)'}</span></label><div class="fieldDescription">${locations.length ? locations.map(escapeHtml).join('<br>') : 'No current path'}</div>`;
+                    host.appendChild(wrapper);
+                });
+            }
+
+            async function refreshStatus() {
+                const status = await api('CommercialSkipper/Status');
+                const activeItemIds = property(status, 'activeItemIds', 'ActiveItemIds') || [];
+                const lastError = property(status, 'lastError', 'LastError');
+                value('CommercialSkipperStatus').textContent = `Queued: ${property(status, 'queued', 'Queued')}; active: ${activeItemIds.length}; successful: ${property(status, 'successfulResults', 'SuccessfulResults')}; failed: ${property(status, 'failedResults', 'FailedResults')}${lastError ? '; last error: ' + lastError : ''}`;
+            }
+
+            page.addEventListener('pageshow', async () => {
+                Dashboard.showLoadingMsg();
+                try {
+                    const config = await ApiClient.getPluginConfiguration(pluginId);
+                    ['AutomaticAnalysis', 'FollowRecordingLibraries', 'PlayNice', 'KeepFailedJobDiagnostics'].forEach(id => value(id).checked = !!config[id]);
+                    ['ComskipPath', 'CustomIniPath', 'CompletionDelaySeconds', 'StabilitySeconds', 'ComskipThreads', 'MaxConcurrentJobs', 'TimeoutMinutes'].forEach(id => value(id).value = config[id] ?? '');
+                    await loadLibraries();
+                    await refreshStatus();
+                } finally {
+                    Dashboard.hideLoadingMsg();
+                }
+            });
+
+            document.querySelector('#CommercialSkipperConfigForm').addEventListener('submit', async event => {
+                event.preventDefault();
+                Dashboard.showLoadingMsg();
+                const config = await ApiClient.getPluginConfiguration(pluginId);
+                ['AutomaticAnalysis', 'FollowRecordingLibraries', 'PlayNice', 'KeepFailedJobDiagnostics'].forEach(id => config[id] = value(id).checked);
+                ['ComskipPath', 'CustomIniPath'].forEach(id => config[id] = value(id).value.trim());
+                ['CompletionDelaySeconds', 'StabilitySeconds', 'ComskipThreads', 'MaxConcurrentJobs', 'TimeoutMinutes'].forEach(id => config[id] = Number(value(id).value));
+                config.SelectedLibraryIds = Array.from(document.querySelectorAll('[data-library-id]:checked')).map(input => input.dataset.libraryId);
+                const result = await ApiClient.updatePluginConfiguration(pluginId, config);
+                Dashboard.processPluginConfigurationUpdateResult(result);
+                return false;
+            });
+
+            value('CommercialSkipperTest').addEventListener('click', async () => {
+                Dashboard.showLoadingMsg();
+                try { const result = await api('CommercialSkipper/Detector/Test', 'POST'); const exitCode = property(result, 'exitCode', 'ExitCode'); const standardError = property(result, 'standardError', 'StandardError'); Dashboard.alert(exitCode === 0 ? 'Comskip started successfully.' : `Comskip returned ${exitCode}: ${standardError}`); } catch (error) { Dashboard.alert(error.message || String(error)); } finally { Dashboard.hideLoadingMsg(); }
+            });
+            value('CommercialSkipperScan').addEventListener('click', async () => { await api('CommercialSkipper/Scans', 'POST', { Force: false }); await refreshStatus(); });
+            value('CommercialSkipperForceScan').addEventListener('click', async () => { await api('CommercialSkipper/Scans', 'POST', { Force: true }); await refreshStatus(); });
+        })();
+    </script>
+</div>
+</body>
+</html>

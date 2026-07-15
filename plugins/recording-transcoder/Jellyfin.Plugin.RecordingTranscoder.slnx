@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/Jellyfin.Plugin.RecordingTranscoder/Jellyfin.Plugin.RecordingTranscoder.csproj" />
+  <Project Path="tests/Jellyfin.Plugin.RecordingTranscoder.Tests/Jellyfin.Plugin.RecordingTranscoder.Tests.csproj" />
+</Solution>

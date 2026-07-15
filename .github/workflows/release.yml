@@ -1,17 +1,19 @@
-name: Release Transcoding Policy
+name: Release Jellyfin Plugin
 
 on:
   push:
     tags:
       - "transcoding-policy-v*.*.*.*"
+      - "commercial-skipper-v*.*.*.*"
+      - "recording-transcoder-v*.*.*.*"
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Plugin release tag, for example transcoding-policy-v1.0.0.0"
+        description: "Plugin release tag, for example commercial-skipper-v1.0.0.0"
         required: true
         type: string
       changelog:
-        description: "Catalog changelog (defaults to Release <version>)"
+        description: "Catalog changelog (defaults to the plugin build metadata)"
         required: false
         type: string
 
@@ -27,7 +29,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
-      PLUGIN_DIR: plugins/transcoding-policy
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -39,7 +40,7 @@ jobs:
         with:
           dotnet-version: 9.0.316
 
-      - name: Resolve and validate version
+      - name: Resolve plugin and validate version
         id: release
         shell: bash
         env:
@@ -52,26 +53,43 @@ jobs:
             TAG="$GITHUB_REF_NAME"
           fi
 
-          if [[ ! "$TAG" =~ ^transcoding-policy-v[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Release tag must look like transcoding-policy-v1.0.0.0: $TAG" >&2
+          if [[ ! "$TAG" =~ ^(transcoding-policy|commercial-skipper|recording-transcoder)-v([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "Unsupported release tag: $TAG" >&2
             exit 1
           fi
 
-          VERSION="${TAG#transcoding-policy-v}"
+          SLUG="${BASH_REMATCH[1]}"
+          VERSION="${BASH_REMATCH[2]}"
+          PLUGIN_DIR="plugins/$SLUG"
+          case "$SLUG" in
+            transcoding-policy)
+              DISPLAY_NAME="Transcoding Policy"
+              PROJECT="$PLUGIN_DIR/src/Jellyfin.Plugin.TranscodingPolicy/Jellyfin.Plugin.TranscodingPolicy.csproj"
+              ;;
+            commercial-skipper)
+              DISPLAY_NAME="Commercial Skipper"
+              PROJECT="$PLUGIN_DIR/src/Jellyfin.Plugin.CommercialSkipper/Jellyfin.Plugin.CommercialSkipper.csproj"
+              ;;
+            recording-transcoder)
+              DISPLAY_NAME="Recording Transcoder"
+              PROJECT="$PLUGIN_DIR/src/Jellyfin.Plugin.RecordingTranscoder/Jellyfin.Plugin.RecordingTranscoder.csproj"
+              ;;
+          esac
+
           BUILD_VERSION="$(sed -n 's/^version: *"\([^"]*\)".*/\1/p' "$PLUGIN_DIR/build.yaml")"
           if [[ "$VERSION" != "$BUILD_VERSION" ]]; then
             echo "Tag version $VERSION does not match build.yaml version $BUILD_VERSION" >&2
             exit 1
           fi
 
-          PROJECT_VERSION="$(sed -n 's:.*<Version>\([^<]*\)</Version>.*:\1:p' "$PLUGIN_DIR/src/Jellyfin.Plugin.TranscodingPolicy/Jellyfin.Plugin.TranscodingPolicy.csproj" | head -n 1)"
+          PROJECT_VERSION="$(sed -n 's:.*<Version>\([^<]*\)</Version>.*:\1:p' "$PROJECT" | head -n 1)"
           if [[ "$VERSION" != "$PROJECT_VERSION" ]]; then
             echo "Tag version $VERSION does not match project version $PROJECT_VERSION" >&2
             exit 1
           fi
 
           BUILD_ABI="$(sed -n 's/^targetAbi: *"\([^"]*\)".*/\1/p' "$PLUGIN_DIR/build.yaml")"
-          CATALOG_ABI="$(python3 -c 'import json, os; print(json.load(open(os.path.join(os.environ["PLUGIN_DIR"], "catalog/plugin.json")))["targetAbi"])')"
+          CATALOG_ABI="$(PLUGIN_DIR="$PLUGIN_DIR" python3 -c 'import json, os; print(json.load(open(os.path.join(os.environ["PLUGIN_DIR"], "catalog/plugin.json")))["targetAbi"])')"
           if [[ "$BUILD_ABI" != "$CATALOG_ABI" ]]; then
             echo "build.yaml target ABI $BUILD_ABI does not match catalog target ABI $CATALOG_ABI" >&2
             exit 1
@@ -90,25 +108,36 @@ jobs:
           CHANGELOG="${CHANGELOG:-Release $VERSION}"
           CHANGELOG="${CHANGELOG//$'\r'/ }"
           CHANGELOG="${CHANGELOG//$'\n'/ }"
+
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "slug=$SLUG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "plugin_dir=$PLUGIN_DIR" >> "$GITHUB_OUTPUT"
+          echo "display_name=$DISPLAY_NAME" >> "$GITHUB_OUTPUT"
           echo "changelog=$CHANGELOG" >> "$GITHUB_OUTPUT"
 
       - name: Restore, build, and test
+        env:
+          PLUGIN_DIR: ${{ steps.release.outputs.plugin_dir }}
+          SLUG: ${{ steps.release.outputs.slug }}
         run: |
           make -C "$PLUGIN_DIR" restore
           make -C "$PLUGIN_DIR" build
           make -C "$PLUGIN_DIR" test
-          make -C "$PLUGIN_DIR" test-release-tools
+          if [[ "$SLUG" == "transcoding-policy" ]]; then
+            make -C "$PLUGIN_DIR" test-release-tools
+          fi
 
       - name: Package and validate
         id: package
         shell: bash
         env:
+          PLUGIN_DIR: ${{ steps.release.outputs.plugin_dir }}
+          SLUG: ${{ steps.release.outputs.slug }}
           VERSION: ${{ steps.release.outputs.version }}
         run: |
           make -C "$PLUGIN_DIR" package VERSION="$VERSION"
-          ARCHIVE="$PLUGIN_DIR/artifacts/transcoding-policy_${VERSION}.zip"
+          ARCHIVE="$PLUGIN_DIR/artifacts/${SLUG}_${VERSION}.zip"
           python3 "$PLUGIN_DIR/scripts/validate_package.py" --archive "$ARCHIVE"
           (cd "$PLUGIN_DIR/artifacts" && sha256sum --check "$(basename "$ARCHIVE").sha256")
           (cd "$PLUGIN_DIR/artifacts" && md5sum --check "$(basename "$ARCHIVE").md5")
@@ -121,6 +150,7 @@ jobs:
         env:
           TAG: ${{ steps.release.outputs.tag }}
           VERSION: ${{ steps.release.outputs.version }}
+          DISPLAY_NAME: ${{ steps.release.outputs.display_name }}
         run: |
           if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
             git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
@@ -132,7 +162,7 @@ jobs:
           else
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git tag --annotate "$TAG" --message "Transcoding Policy $VERSION"
+            git tag --annotate "$TAG" --message "$DISPLAY_NAME $VERSION"
             git push origin "$TAG"
           fi
 
@@ -143,6 +173,7 @@ jobs:
           TAG: ${{ steps.release.outputs.tag }}
           VERSION: ${{ steps.release.outputs.version }}
           CHANGELOG: ${{ steps.release.outputs.changelog }}
+          PLUGIN_DIR: ${{ steps.release.outputs.plugin_dir }}
           ARCHIVE: ${{ steps.package.outputs.archive }}
           CHECKSUM: ${{ steps.package.outputs.checksum }}
         run: |
@@ -156,7 +187,7 @@ jobs:
 
           SOURCE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/$(basename "$ARCHIVE")"
           TIMESTAMP="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-          python3 "$PLUGIN_DIR/scripts/update_manifest.py" \
+          python3 plugins/transcoding-policy/scripts/update_manifest.py \
             --manifest "$MANIFEST" \
             --template "$PLUGIN_DIR/catalog/plugin.json" \
             --version "$VERSION" \
@@ -172,6 +203,7 @@ jobs:
         env:
           TAG: ${{ steps.release.outputs.tag }}
           VERSION: ${{ steps.release.outputs.version }}
+          DISPLAY_NAME: ${{ steps.release.outputs.display_name }}
           ARCHIVE: ${{ steps.package.outputs.archive }}
         run: |
           if gh release view "$TAG" >/dev/null 2>&1; then
@@ -182,7 +214,7 @@ jobs:
               "$ARCHIVE.sha256" \
               "$ARCHIVE.md5" \
               --verify-tag \
-              --title "Transcoding Policy $VERSION" \
+              --title "$DISPLAY_NAME $VERSION" \
               --generate-notes
           fi
 
@@ -191,6 +223,7 @@ jobs:
         env:
           MANIFEST: ${{ steps.manifest.outputs.path }}
           VERSION: ${{ steps.release.outputs.version }}
+          DISPLAY_NAME: ${{ steps.release.outputs.display_name }}
         run: |
           WORKTREE="$RUNNER_TEMP/jellyfin-plugins-manifest"
           rm -rf "$WORKTREE"
@@ -214,7 +247,7 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add manifest.json
             if ! git diff --cached --quiet; then
-              git commit --message "Publish Transcoding Policy $VERSION"
+              git commit --message "Publish $DISPLAY_NAME $VERSION"
               git push origin HEAD:manifest
             fi
           )

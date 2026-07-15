@@ -1,0 +1,9 @@
+{
+  "guid": "19323a5b-d8ac-45f4-a1c5-3832498c58bc",
+  "name": "Commercial Skipper",
+  "description": "Runs an external Comskip executable against completed recordings and publishes native Jellyfin Commercial media segments without modifying the media file.",
+  "overview": "Detect commercials in DVR recordings with Comskip.",
+  "owner": "nathanbland",
+  "category": "General",
+  "targetAbi": "10.11.11.0"
+}

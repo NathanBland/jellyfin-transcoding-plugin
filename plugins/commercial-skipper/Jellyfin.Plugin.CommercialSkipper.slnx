@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/Jellyfin.Plugin.CommercialSkipper/Jellyfin.Plugin.CommercialSkipper.csproj" />
+  <Project Path="tests/Jellyfin.Plugin.CommercialSkipper.Tests/Jellyfin.Plugin.CommercialSkipper.Tests.csproj" />
+</Solution>
