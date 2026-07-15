@@ -24,5 +24,23 @@
         "timestamp": "2026-07-15T16:04:46Z"
       }
     ]
+  },
+  {
+    "guid": "19323a5b-d8ac-45f4-a1c5-3832498c58bc",
+    "name": "Commercial Skipper",
+    "description": "Runs an external Comskip executable against completed recordings and publishes native Jellyfin Commercial media segments without modifying the media file.",
+    "overview": "Detect commercials in DVR recordings with Comskip.",
+    "owner": "nathanbland",
+    "category": "General",
+    "versions": [
+      {
+        "version": "1.0.0.0",
+        "changelog": "Initial release with DVR library discovery, coordinated Comskip analysis, native Jellyfin Commercial segments, scheduled reconciliation, and admin controls.",
+        "targetAbi": "10.11.11.0",
+        "sourceUrl": "https://github.com/NathanBland/jellyfin-plugins/releases/download/commercial-skipper-v1.0.0.0/commercial-skipper_1.0.0.0.zip",
+        "checksum": "e0ac6f2c859cc05241d64f46a77e8a58",
+        "timestamp": "2026-07-15T23:24:34Z"
+      }
+    ]
   }
 ]
