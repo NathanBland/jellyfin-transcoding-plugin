@@ -59,7 +59,6 @@
             const page = document.querySelector('#CommercialSkipperConfigPage');
             const value = id => document.querySelector('#' + id);
             const property = (object, camelCase, pascalCase) => object[camelCase] !== undefined ? object[camelCase] : object[pascalCase];
-            const escapeHtml = text => String(text ?? '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
 
             async function api(path, method, data) {
                 return ApiClient.ajax({
@@ -84,7 +83,29 @@
                     const isAvailable = property(library, 'isAvailable', 'IsAvailable') !== false;
                     const wrapper = document.createElement('div');
                     wrapper.className = 'checkboxContainer checkboxContainer-withDescription';
-                    wrapper.innerHTML = `<label class="emby-checkbox-label"><input type="checkbox" is="emby-checkbox" data-library-id="${escapeHtml(id)}" ${isSelected ? 'checked' : ''}><span>${escapeHtml(name)}${isDvrManaged ? ' (DVR)' : ''}${isAvailable ? '' : ' (unavailable)'}</span></label><div class="fieldDescription">${locations.length ? locations.map(escapeHtml).join('<br>') : 'No current path'}</div>`;
+                    wrapper.innerHTML = '<label class="emby-checkbox-label"><input type="checkbox" is="emby-checkbox"><span></span></label><div class="fieldDescription"></div>';
+
+                    const input = wrapper.querySelector('input');
+                    input.dataset.libraryId = String(id);
+                    input.checked = !!isSelected;
+
+                    wrapper.querySelector('span').textContent = String(name)
+                        + (isDvrManaged ? ' (DVR)' : '')
+                        + (isAvailable ? '' : ' (unavailable)');
+
+                    const description = wrapper.querySelector('.fieldDescription');
+                    if (locations.length) {
+                        locations.forEach((location, index) => {
+                            if (index > 0) {
+                                description.appendChild(document.createElement('br'));
+                            }
+
+                            description.appendChild(document.createTextNode(String(location)));
+                        });
+                    } else {
+                        description.textContent = 'No current path';
+                    }
+
                     host.appendChild(wrapper);
                 });
             }
@@ -93,7 +114,11 @@
                 const status = await api('CommercialSkipper/Status');
                 const activeItemIds = property(status, 'activeItemIds', 'ActiveItemIds') || [];
                 const lastError = property(status, 'lastError', 'LastError');
-                value('CommercialSkipperStatus').textContent = `Queued: ${property(status, 'queued', 'Queued')}; active: ${activeItemIds.length}; successful: ${property(status, 'successfulResults', 'SuccessfulResults')}; failed: ${property(status, 'failedResults', 'FailedResults')}${lastError ? '; last error: ' + lastError : ''}`;
+                value('CommercialSkipperStatus').textContent = 'Queued: ' + property(status, 'queued', 'Queued')
+                    + '; active: ' + activeItemIds.length
+                    + '; successful: ' + property(status, 'successfulResults', 'SuccessfulResults')
+                    + '; failed: ' + property(status, 'failedResults', 'FailedResults')
+                    + (lastError ? '; last error: ' + lastError : '');
             }
 
             page.addEventListener('pageshow', async () => {
@@ -124,7 +149,7 @@
 
             value('CommercialSkipperTest').addEventListener('click', async () => {
                 Dashboard.showLoadingMsg();
-                try { const result = await api('CommercialSkipper/Detector/Test', 'POST'); const exitCode = property(result, 'exitCode', 'ExitCode'); const standardError = property(result, 'standardError', 'StandardError'); Dashboard.alert(exitCode === 0 ? 'Comskip started successfully.' : `Comskip returned ${exitCode}: ${standardError}`); } catch (error) { Dashboard.alert(error.message || String(error)); } finally { Dashboard.hideLoadingMsg(); }
+                try { const result = await api('CommercialSkipper/Detector/Test', 'POST'); const exitCode = property(result, 'exitCode', 'ExitCode'); const standardError = property(result, 'standardError', 'StandardError'); Dashboard.alert(exitCode === 0 ? 'Comskip started successfully.' : 'Comskip returned ' + exitCode + ': ' + standardError); } catch (error) { Dashboard.alert(error.message || String(error)); } finally { Dashboard.hideLoadingMsg(); }
             });
             value('CommercialSkipperScan').addEventListener('click', async () => { await api('CommercialSkipper/Scans', 'POST', { Force: false }); await refreshStatus(); });
             value('CommercialSkipperForceScan').addEventListener('click', async () => { await api('CommercialSkipper/Scans', 'POST', { Force: true }); await refreshStatus(); });

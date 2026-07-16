@@ -1,7 +1,7 @@
 ---
 name: "Commercial Skipper"
 guid: "19323a5b-d8ac-45f4-a1c5-3832498c58bc"
-version: "1.0.0.1"
+version: "1.0.0.2"
 targetAbi: "10.11.11.0"
 framework: "net9.0"
 overview: "Detect commercials in DVR recordings with Comskip."
@@ -13,6 +13,6 @@ owner: "nathanbland"
 artifacts:
 - "Jellyfin.Plugin.CommercialSkipper.dll"
 changelog: >
-  Fix Jellyfin 10.11.11 startup by removing a circular dependency between the
-  commercial segment provider and the recordings manager. Add an isolated
-  Jellyfin startup regression check.
+  Fix dynamic library labels, paths, status, and detector messages rendering as
+  JavaScript source in Jellyfin Web. Build dynamic library rows with safe DOM text
+  nodes and add embedded-page regression coverage.

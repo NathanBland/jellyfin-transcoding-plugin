@@ -60,8 +60,8 @@ A .NET 9 SDK, Python 3, `make`, and `zip` are required. Set `DOTNET=/path/to/dot
 Releases use independent four-part tags:
 
 ```text
-commercial-skipper-v1.0.0.1
-recording-transcoder-v1.0.0.0
+commercial-skipper-v1.0.0.2
+recording-transcoder-v1.0.0.1
 transcoding-policy-v1.0.0.1
 ```
 

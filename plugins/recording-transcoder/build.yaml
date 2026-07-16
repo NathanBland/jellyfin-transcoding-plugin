@@ -1,7 +1,7 @@
 ---
 name: "Recording Transcoder"
 guid: "6dbb9479-cd8e-4b64-8c10-70e64c90a809"
-version: "1.0.0.0"
+version: "1.0.0.1"
 targetAbi: "10.11.11.0"
 framework: "net9.0"
 overview: "Safely recompress completed DVR recordings with Jellyfin FFmpeg."
@@ -13,5 +13,6 @@ owner: "nathanbland"
 artifacts:
 - "Jellyfin.Plugin.RecordingTranscoder.dll"
 changelog: >
-  Initial release with cross-platform Jellyfin hardware settings, verified software
-  fallback, stream and caption validation, crash recovery, and coordinated commercial scans.
+  Fix dynamic library labels, paths, status, capability details, and encoder messages
+  rendering as JavaScript source in Jellyfin Web. Build dynamic library rows with safe
+  DOM text nodes and add embedded-page regression coverage.
