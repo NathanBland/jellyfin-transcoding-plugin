@@ -15,15 +15,25 @@ Requires Jellyfin 10.11.11 / .NET 9 and an external Comskip executable.
 
 ### Build Comskip on Apple Silicon macOS
 
-The repository includes a non-root helper pinned to Comskip commit `a140b6ac8bc8f596729e9052819affc779c3b377`:
+The Jellyfin Catalog installation contains only the plugin's runtime DLL and
+metadata. It does not install build scripts into Jellyfin's plugin directory.
+
+The source repository includes a non-root helper pinned to Comskip commit
+`a140b6ac8bc8f596729e9052819affc779c3b377`. Clone the source repository first
+if you do not already have a checkout:
 
 ```bash
+git clone https://github.com/NathanBland/jellyfin-plugins.git
+cd jellyfin-plugins/plugins/commercial-skipper
 brew install autoconf automake libtool pkgconf argtable ffmpeg
-cd plugins/commercial-skipper
 ./scripts/build-comskip-macos.sh
 ```
 
-It installs `comskip` to `~/.local/bin/comskip`. To choose another location:
+If the repository is already checked out, run the helper from
+`/path/to/jellyfin-plugins/plugins/commercial-skipper`.
+
+The helper installs `comskip` to `~/.local/bin/comskip`. To choose another
+location:
 
 ```bash
 ./scripts/build-comskip-macos.sh --prefix /path/to/prefix
@@ -62,6 +72,11 @@ EDL ranges are validated, clamped to the recording duration, sorted, and merged 
 When Recording Transcoder is installed, Commercial Skipper waits for its lease and analyzes the final transcoded file.
 
 ## Troubleshooting
+
+Commercial Skipper 1.0.0.2 and earlier may display `[object Response]` when
+**Test Comskip** encounters an error. Version 1.0.0.3 reports the actual
+executable, INI, timeout, or process error and correctly accepts Comskip's help
+response.
 
 Commercial Skipper 1.0.0.0 can prevent Jellyfin 10.11.11 from starting. Version
 1.0.0.1 fixes the dependency cycle. If 1.0.0.0 is installed and Jellyfin cannot
