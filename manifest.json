@@ -34,6 +34,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.0.0.3",
+        "changelog": "Replace opaque [object Response] Comskip test failures with structured diagnostics for missing executables, invalid INI paths, timeouts, and process failures. Test the form's current paths and recognize Comskip's expected exit code 2 help response.",
+        "targetAbi": "10.11.11.0",
+        "sourceUrl": "https://github.com/NathanBland/jellyfin-plugins/releases/download/commercial-skipper-v1.0.0.3/commercial-skipper_1.0.0.3.zip",
+        "checksum": "b6a6e73f086209bdfb3c2473734781ed",
+        "timestamp": "2026-07-16T02:34:57Z"
+      },
+      {
         "version": "1.0.0.2",
         "changelog": "Fix dynamic library labels, paths, status, and detector messages rendering as JavaScript source in Jellyfin Web. Build dynamic library rows with safe DOM text nodes and add embedded-page regression coverage.",
         "targetAbi": "10.11.11.0",
