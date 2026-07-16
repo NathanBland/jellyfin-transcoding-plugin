@@ -1,6 +1,5 @@
 using Jellyfin.Database.Implementations.Enums;
 using Jellyfin.Plugin.CommercialSkipper.Analysis;
-using Jellyfin.Plugin.CommercialSkipper.Configuration;
 using Jellyfin.Plugin.CommercialSkipper.Models;
 using Jellyfin.Plugin.RecordingPipeline;
 using MediaBrowser.Controller.Entities;
@@ -11,9 +10,10 @@ using MediaBrowser.Model.MediaSegments;
 
 namespace Jellyfin.Plugin.CommercialSkipper.Providers;
 
+// Keep this provider free of IRecordingsManager and LibraryScopeResolver. Jellyfin resolves
+// segment providers while constructing IProviderManager, and recording services depend on it.
 public sealed class CommercialSegmentProvider(
     CommercialResultStore resultStore,
-    LibraryScopeResolver scopeResolver,
     ILibraryManager libraryManager) : IMediaSegmentProvider
 {
     public string Name => "Commercial Skipper";
@@ -26,10 +26,8 @@ public sealed class CommercialSegmentProvider(
         CancellationToken cancellationToken)
     {
         var item = Plugin.Instance is null ? null : libraryManager.GetItemById(request.ItemId);
-        var configuration = Plugin.Instance?.Configuration ?? new PluginConfiguration();
         if (item is null
-            || string.IsNullOrWhiteSpace(item.Path)
-            || !scopeResolver.IsInScope(item.Path, configuration.FollowRecordingLibraries, configuration.SelectedLibraryIds))
+            || string.IsNullOrWhiteSpace(item.Path))
         {
             return [];
         }
@@ -57,12 +55,12 @@ public sealed class CommercialSegmentProvider(
         }
 
         return record.Segments.Select(segment => new MediaSegmentDto
-            {
-                ItemId = request.ItemId,
-                Type = MediaSegmentType.Commercial,
-                StartTicks = segment.StartTicks,
-                EndTicks = segment.EndTicks
-            })
+        {
+            ItemId = request.ItemId,
+            Type = MediaSegmentType.Commercial,
+            StartTicks = segment.StartTicks,
+            EndTicks = segment.EndTicks
+        })
             .ToArray();
     }
 

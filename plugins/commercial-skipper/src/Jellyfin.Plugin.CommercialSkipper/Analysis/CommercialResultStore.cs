@@ -1,5 +1,6 @@
 using Jellyfin.Plugin.CommercialSkipper.Models;
 using Jellyfin.Plugin.RecordingPipeline;
+using MediaBrowser.Common.Configuration;
 
 namespace Jellyfin.Plugin.CommercialSkipper.Analysis;
 
@@ -7,10 +8,11 @@ public sealed class CommercialResultStore
 {
     private readonly string _directory;
 
-    public CommercialResultStore()
+    public CommercialResultStore(IApplicationPaths applicationPaths)
     {
         _directory = Path.Combine(
-            Plugin.Instance?.DataDirectory ?? throw new InvalidOperationException("Plugin is not initialized."),
+            applicationPaths.DataPath,
+            "commercial-skipper",
             "results");
         Directory.CreateDirectory(_directory);
     }

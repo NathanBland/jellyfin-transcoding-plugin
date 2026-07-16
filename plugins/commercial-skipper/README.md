@@ -59,9 +59,22 @@ Item events queue completed local recordings, and a six-hour scheduled task reco
 
 EDL ranges are validated, clamped to the recording duration, sorted, and merged when overlapping or separated by 250 ms or less. Results are invalidated when the source file or detector configuration changes.
 
-When Recording Transcoder is installed, Commercial Skipper waits for its lease and analyzes the final HEVC file.
+When Recording Transcoder is installed, Commercial Skipper waits for its lease and analyzes the final transcoded file.
 
 ## Troubleshooting
+
+Commercial Skipper 1.0.0.0 can prevent Jellyfin 10.11.11 from starting. Version
+1.0.0.1 fixes the dependency cycle. If 1.0.0.0 is installed and Jellyfin cannot
+start, quit Jellyfin and move that version outside the plugins directory:
+
+```bash
+mkdir -p ~/Desktop/Jellyfin-disabled-plugins
+mv ~/Library/Application\ Support/jellyfin/plugins/Commercial\ Skipper_1.0.0.0 \
+  ~/Desktop/Jellyfin-disabled-plugins/
+```
+
+Start Jellyfin, correct the repository URL if necessary, and install 1.0.0.1 or
+newer from the Catalog.
 
 If prompts do not appear:
 

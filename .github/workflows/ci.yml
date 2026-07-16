@@ -57,6 +57,13 @@ jobs:
       - name: Package
         run: ./scripts/package.sh
 
+      - name: Verify Jellyfin startup with Commercial Skipper
+        if: matrix.slug == 'commercial-skipper'
+        shell: bash
+        run: |
+          VERSION="$(sed -n 's/^version: *"\([^"]*\)".*/\1/p' build.yaml)"
+          ./scripts/verify-jellyfin-startup.sh "artifacts/commercial-skipper_${VERSION}.zip"
+
       - name: Validate package layout and checksums
         shell: bash
         run: |
